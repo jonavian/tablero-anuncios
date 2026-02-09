@@ -326,11 +326,6 @@ function App() {
               ))}
             </div>
 
-            {/* Theme toggle */}
-            <button className="theme-btn" onClick={toggleTheme}>
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
-
             {/* Admin button */}
             <button
               className="admin-btn"
@@ -428,6 +423,11 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* ====== THEME TOGGLE ====== */}
+      <button className="theme-btn" onClick={toggleTheme}>
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
 
       {/* ====== IMAGE MODAL WITH ZOOM ====== */}
       {modalImage && (
