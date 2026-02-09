@@ -307,7 +307,7 @@ function App() {
                   <span className="card-name">{cat.name}</span>
                   <span className="card-count">
                     {cat.images.length}{' '}
-                    {cat.images.length === 1 ? 'imagen' : 'imágenes'}
+                    {cat.images.length === 1 ? 'anuncio' : 'anuncios'}
                   </span>
                   <span className="card-arrow">→</span>
                 </button>
@@ -365,7 +365,7 @@ function App() {
                         e.stopPropagation()
                         handleDeleteImage(currentCategory.id, index)
                       }}
-                      title="Eliminar imagen"
+                      title="Eliminar anuncio"
                     >
                       ✕
                     </button>
@@ -376,7 +376,7 @@ function App() {
               {currentCategory?.images.length === 0 && (
                 <div className="empty-state">
                   <span className="empty-icon">📷</span>
-                  <p>No hay imágenes todavía</p>
+                  <p>No hay anuncios todavía</p>
                   {isAdmin && (
                     <p className="empty-hint">
                       Toca el botón + para agregar anuncios
