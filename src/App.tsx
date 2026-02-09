@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
+import { type ImageRecord, fetchImagesByCategory, uploadImage, deleteImage } from './lib/images'
 
 interface CategoryData {
   id: string
@@ -7,7 +8,7 @@ interface CategoryData {
   icon: string
   color: string
   gradient: string
-  images: string[]
+  images: ImageRecord[]
 }
 
 const CATEGORIES: CategoryData[] = [
@@ -45,37 +46,14 @@ const CATEGORIES: CategoryData[] = [
   },
 ]
 
-const STORAGE_KEY = 'tablero-nemby-data'
-
-function loadData(): CategoryData[] {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved) as Record<string, string[]>
-      return CATEGORIES.map((cat) => ({
-        ...cat,
-        images: parsed[cat.id] || [],
-      }))
-    }
-  } catch {
-    // ignore
-  }
-  return CATEGORIES.map((cat) => ({ ...cat, images: [] }))
-}
-
-function saveData(categories: CategoryData[]) {
-  const data: Record<string, string[]> = {}
-  categories.forEach((cat) => {
-    data[cat.id] = cat.images
-  })
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
 function App() {
-  const [categories, setCategories] = useState<CategoryData[]>(loadData)
+  const [categories, setCategories] = useState<CategoryData[]>(CATEGORIES)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [modalImage, setModalImage] = useState<string | null>(null)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ====== ZOOM STATE ======
@@ -107,9 +85,35 @@ function App() {
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
 
+  // ====== LOAD DATA FROM SUPABASE ======
   useEffect(() => {
-    saveData(categories)
-  }, [categories])
+    let cancelled = false
+    async function load() {
+      try {
+        const results = await Promise.all(
+          CATEGORIES.map((cat) => fetchImagesByCategory(cat.id))
+        )
+        if (cancelled) return
+        setCategories(
+          CATEGORIES.map((cat, i) => ({ ...cat, images: results[i] }))
+        )
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : 'Error al cargar datos')
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  // ====== AUTO-DISMISS ERROR ======
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(null), 4000)
+    return () => clearTimeout(timer)
+  }, [error])
 
   const handleCategoryClick = useCallback((id: string) => {
     setIsTransitioning(true)
@@ -132,28 +136,29 @@ function App() {
   }, [])
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files
       if (!files || !activeCategory) return
 
-      Array.from(files).forEach((file) => {
-        if (!file.type.startsWith('image/')) return
+      setIsUploading(true)
+      try {
+        for (const file of Array.from(files)) {
+          if (!file.type.startsWith('image/')) continue
 
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-          const result = ev.target?.result as string
-          if (result) {
-            setCategories((prev) =>
-              prev.map((cat) =>
-                cat.id === activeCategory
-                  ? { ...cat, images: [...cat.images, result] }
-                  : cat
-              )
+          const record = await uploadImage(activeCategory, file)
+          setCategories((prev) =>
+            prev.map((cat) =>
+              cat.id === activeCategory
+                ? { ...cat, images: [record, ...cat.images] }
+                : cat
             )
-          }
+          )
         }
-        reader.readAsDataURL(file)
-      })
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al subir imagen')
+      } finally {
+        setIsUploading(false)
+      }
 
       e.target.value = ''
     },
@@ -161,14 +166,19 @@ function App() {
   )
 
   const handleDeleteImage = useCallback(
-    (categoryId: string, index: number) => {
-      setCategories((prev) =>
-        prev.map((cat) =>
-          cat.id === categoryId
-            ? { ...cat, images: cat.images.filter((_, i) => i !== index) }
-            : cat
+    async (categoryId: string, record: ImageRecord) => {
+      try {
+        await deleteImage(record)
+        setCategories((prev) =>
+          prev.map((cat) =>
+            cat.id === categoryId
+              ? { ...cat, images: cat.images.filter((img) => img.id !== record.id) }
+              : cat
+          )
         )
-      )
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al eliminar imagen')
+      }
     },
     []
   )
@@ -280,6 +290,21 @@ function App() {
 
   const currentCategory = categories.find((c) => c.id === activeCategory)
 
+  // ====== LOADING STATE ======
+  if (isLoading) {
+    return (
+      <div className="app">
+        <div className="bg-orb bg-orb-1" />
+        <div className="bg-orb bg-orb-2" />
+        <div className="bg-orb bg-orb-3" />
+        <div className="loading-state">
+          <div className="spinner" />
+          <p>Cargando tablero...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       {/* Background decoration */}
@@ -357,25 +382,25 @@ function App() {
             </header>
 
             <div className="image-grid">
-              {currentCategory?.images.map((img, index) => (
+              {currentCategory?.images.map((img) => (
                 <div
-                  key={index}
+                  key={img.id}
                   className="image-card"
                   style={
-                    { '--anim-delay': `${index * 0.05}s` } as React.CSSProperties
+                    { '--anim-delay': '0s' } as React.CSSProperties
                   }
                 >
                   <img
-                    src={img}
-                    alt={`Anuncio ${index + 1}`}
-                    onClick={() => setModalImage(img)}
+                    src={img.url}
+                    alt="Anuncio"
+                    onClick={() => setModalImage(img.url)}
                   />
                   {isAdmin && (
                     <button
                       className="delete-btn"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDeleteImage(currentCategory.id, index)
+                        handleDeleteImage(currentCategory.id, img)
                       }}
                       title="Eliminar anuncio"
                     >
@@ -423,6 +448,21 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* ====== UPLOAD OVERLAY ====== */}
+      {isUploading && (
+        <div className="upload-overlay">
+          <div className="spinner" />
+          <p>Subiendo imagen...</p>
+        </div>
+      )}
+
+      {/* ====== ERROR TOAST ====== */}
+      {error && (
+        <div className="error-toast" onClick={() => setError(null)}>
+          {error}
+        </div>
+      )}
 
       {/* ====== THEME TOGGLE ====== */}
       <button className="theme-btn" onClick={toggleTheme}>
