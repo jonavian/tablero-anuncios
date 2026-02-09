@@ -78,6 +78,23 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // ====== ZOOM STATE ======
+  const [scale, setScale] = useState(1)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const lastTapRef = useRef(0)
+  const pinchStartDistRef = useRef(0)
+  const pinchStartScaleRef = useRef(1)
+  const panStartRef = useRef({ x: 0, y: 0 })
+  const posStartRef = useRef({ x: 0, y: 0 })
+  const isPanningRef = useRef(false)
+
+  // ====== ADMIN STATE ======
+  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('tablero-admin') === 'true')
+  const [showLogin, setShowLogin] = useState(false)
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPass, setLoginPass] = useState('')
+  const [loginError, setLoginError] = useState('')
+
   useEffect(() => {
     saveData(categories)
   }, [categories])
@@ -144,6 +161,111 @@ function App() {
     []
   )
 
+  // ====== ZOOM HANDLERS ======
+  const resetZoom = useCallback(() => {
+    setScale(1)
+    setPosition({ x: 0, y: 0 })
+  }, [])
+
+  const closeModal = useCallback(() => {
+    setModalImage(null)
+    resetZoom()
+  }, [resetZoom])
+
+  const handleDoubleTap = useCallback(() => {
+    const now = Date.now()
+    const DOUBLE_TAP_DELAY = 300
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      // Toggle zoom
+      if (scale > 1) {
+        resetZoom()
+      } else {
+        setScale(2.5)
+        setPosition({ x: 0, y: 0 })
+      }
+    }
+    lastTapRef.current = now
+  }, [scale, resetZoom])
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Pinch start
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        pinchStartDistRef.current = Math.hypot(dx, dy)
+        pinchStartScaleRef.current = scale
+      } else if (e.touches.length === 1 && scale > 1) {
+        // Pan start
+        isPanningRef.current = true
+        panStartRef.current = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+        }
+        posStartRef.current = { ...position }
+      }
+    },
+    [scale, position]
+  )
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Pinch move
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        const dist = Math.hypot(dx, dy)
+        const newScale = Math.min(
+          5,
+          Math.max(1, pinchStartScaleRef.current * (dist / pinchStartDistRef.current))
+        )
+        setScale(newScale)
+        if (newScale <= 1) {
+          setPosition({ x: 0, y: 0 })
+        }
+      } else if (e.touches.length === 1 && isPanningRef.current && scale > 1) {
+        // Pan move
+        const dx = e.touches[0].clientX - panStartRef.current.x
+        const dy = e.touches[0].clientY - panStartRef.current.y
+        setPosition({
+          x: posStartRef.current.x + dx,
+          y: posStartRef.current.y + dy,
+        })
+      }
+    },
+    [scale]
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    isPanningRef.current = false
+    if (scale <= 1) {
+      resetZoom()
+    }
+  }, [scale, resetZoom])
+
+  // ====== ADMIN HANDLERS ======
+  const handleLogin = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      if (loginUser === 'admin' && loginPass === 'nemby2026') {
+        setIsAdmin(true)
+        sessionStorage.setItem('tablero-admin', 'true')
+        setShowLogin(false)
+        setLoginUser('')
+        setLoginPass('')
+        setLoginError('')
+      } else {
+        setLoginError('Usuario o contraseña incorrectos')
+      }
+    },
+    [loginUser, loginPass]
+  )
+
+  const handleLogout = useCallback(() => {
+    setIsAdmin(false)
+    sessionStorage.removeItem('tablero-admin')
+  }, [])
+
   const currentCategory = categories.find((c) => c.id === activeCategory)
 
   return (
@@ -191,6 +313,14 @@ function App() {
                 </button>
               ))}
             </div>
+
+            {/* Admin button */}
+            <button
+              className="admin-btn"
+              onClick={isAdmin ? handleLogout : () => setShowLogin(true)}
+            >
+              {isAdmin ? 'Cerrar sesión' : 'Acceso Admin'}
+            </button>
           </div>
         ) : (
           /* ====== CATEGORY DETAIL SCREEN ====== */
@@ -228,16 +358,18 @@ function App() {
                     alt={`Anuncio ${index + 1}`}
                     onClick={() => setModalImage(img)}
                   />
-                  <button
-                    className="delete-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteImage(currentCategory.id, index)
-                    }}
-                    title="Eliminar imagen"
-                  >
-                    ✕
-                  </button>
+                  {isAdmin && (
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteImage(currentCategory.id, index)
+                      }}
+                      title="Eliminar imagen"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
 
@@ -245,24 +377,28 @@ function App() {
                 <div className="empty-state">
                   <span className="empty-icon">📷</span>
                   <p>No hay imágenes todavía</p>
-                  <p className="empty-hint">
-                    Toca el botón + para agregar anuncios
-                  </p>
+                  {isAdmin && (
+                    <p className="empty-hint">
+                      Toca el botón + para agregar anuncios
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            <button
-              className="fab"
-              onClick={handleUpload}
-              style={
-                {
-                  '--fab-gradient': currentCategory?.gradient,
-                } as React.CSSProperties
-              }
-            >
-              <span className="fab-icon">+</span>
-            </button>
+            {isAdmin && (
+              <button
+                className="fab"
+                onClick={handleUpload}
+                style={
+                  {
+                    '--fab-gradient': currentCategory?.gradient,
+                  } as React.CSSProperties
+                }
+              >
+                <span className="fab-icon">+</span>
+              </button>
+            )}
 
             <input
               ref={fileInputRef}
@@ -276,14 +412,72 @@ function App() {
         )}
       </div>
 
-      {/* ====== IMAGE MODAL ====== */}
+      {/* ====== IMAGE MODAL WITH ZOOM ====== */}
       {modalImage && (
-        <div className="modal-overlay" onClick={() => setModalImage(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <img src={modalImage} alt="Anuncio ampliado" />
+        <div className="modal-overlay" onClick={closeModal}>
+          <div
+            className="modal-content modal-image-container"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <img
+              src={modalImage}
+              alt="Anuncio ampliado"
+              onClick={handleDoubleTap}
+              draggable={false}
+              style={{
+                transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+                transition: isPanningRef.current ? 'none' : 'transform 0.25s ease',
+              }}
+            />
+            <button className="modal-close" onClick={closeModal}>
+              ✕
+            </button>
+            {scale > 1 && (
+              <div className="zoom-indicator">{Math.round(scale * 100)}%</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ====== LOGIN MODAL ====== */}
+      {showLogin && (
+        <div className="modal-overlay" onClick={() => setShowLogin(false)}>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="login-title">Acceso Admin</h3>
+            <form className="login-form" onSubmit={handleLogin}>
+              <input
+                className="login-input"
+                type="text"
+                placeholder="Usuario"
+                value={loginUser}
+                onChange={(e) => {
+                  setLoginUser(e.target.value)
+                  setLoginError('')
+                }}
+                autoComplete="username"
+              />
+              <input
+                className="login-input"
+                type="password"
+                placeholder="Contraseña"
+                value={loginPass}
+                onChange={(e) => {
+                  setLoginPass(e.target.value)
+                  setLoginError('')
+                }}
+                autoComplete="current-password"
+              />
+              {loginError && <p className="login-error">{loginError}</p>}
+              <button className="login-submit" type="submit">
+                Ingresar
+              </button>
+            </form>
             <button
               className="modal-close"
-              onClick={() => setModalImage(null)}
+              onClick={() => setShowLogin(false)}
             >
               ✕
             </button>

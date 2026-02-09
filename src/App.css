@@ -469,3 +469,139 @@
 .modal-close:active {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ============================
+   MODAL IMAGE ZOOM
+   ============================ */
+.modal-image-container {
+  overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.modal-image-container img {
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.zoom-indicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  animation: modalFadeIn 0.2s ease;
+}
+
+/* ============================
+   ADMIN BUTTON
+   ============================ */
+.admin-btn {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 50px;
+  backdrop-filter: blur(12px);
+  z-index: 20;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.admin-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+/* ============================
+   LOGIN MODAL
+   ============================ */
+.login-modal {
+  position: relative;
+  width: 90%;
+  max-width: 340px;
+  background: rgba(30, 30, 50, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius);
+  padding: 2rem 1.5rem;
+  animation: modalZoomIn 0.3s ease;
+}
+
+.login-title {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.login-input:focus {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.login-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.login-error {
+  color: #ff6b6b;
+  font-size: 0.8rem;
+  text-align: center;
+  margin: 0;
+  animation: fadeIn 0.2s ease;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), #6c5ce7);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  font-family: inherit;
+  margin-top: 0.25rem;
+}
+
+.login-submit:active {
+  opacity: 0.85;
+  transform: scale(0.97);
+}
