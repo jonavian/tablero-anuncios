@@ -88,6 +88,18 @@ function App() {
   const posStartRef = useRef({ x: 0, y: 0 })
   const isPanningRef = useRef(false)
 
+  // ====== THEME STATE ======
+  const [theme, setTheme] = useState(() => localStorage.getItem('tablero-theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'))
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('tablero-theme', theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }, [])
+
   // ====== ADMIN STATE ======
   const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('tablero-admin') === 'true')
   const [showLogin, setShowLogin] = useState(false)
@@ -313,6 +325,11 @@ function App() {
                 </button>
               ))}
             </div>
+
+            {/* Theme toggle */}
+            <button className="theme-btn" onClick={toggleTheme}>
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
 
             {/* Admin button */}
             <button
